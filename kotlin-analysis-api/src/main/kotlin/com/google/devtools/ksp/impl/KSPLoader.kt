@@ -24,6 +24,13 @@ import java.io.ObjectInputStream
 
 class KSPLoader {
     companion object {
+        /**
+         * Keep the handlers of the jars that did not change from one KSP task to the next. The Gradle plugin turns it on when it
+         * keeps the class loader of KSP in the daemon (ksp.classloader.cache), so that this state outlives the task.
+         */
+        @JvmStatic
+        var keepJarHandlers: Boolean = false
+
         @JvmStatic
         fun loadAndRunKSP(
             kspConfigStream: ByteArray,

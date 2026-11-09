@@ -865,6 +865,10 @@ abstract class KspAAWorkerAction : WorkAction<KspAAWorkParameter> {
 
         val exitCode = try {
             val kspLoaderClass = isolatedClassLoader.loadClass("com.google.devtools.ksp.impl.KSPLoader")
+            if (keepLoaders) {
+                // The kept loader keeps the state of KSP, so KSP can keep the handlers of the jars that did not change too.
+                runCatching { kspLoaderClass.getMethod("setKeepJarHandlers", Boolean::class.java).invoke(null, true) }
+            }
             val runMethod = kspLoaderClass.getMethod(
                 "loadAndRunKSP",
                 ByteArray::class.java,

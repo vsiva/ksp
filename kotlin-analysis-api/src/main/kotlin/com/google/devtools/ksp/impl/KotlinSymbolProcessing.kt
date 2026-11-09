@@ -104,6 +104,7 @@ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreProjectEnvironment
 import org.jetbrains.kotlin.cli.jvm.compiler.setupIdeaStandaloneExecution
 import org.jetbrains.kotlin.config.ApiVersion
+import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.config.KotlinCompilerVersion
 import org.jetbrains.kotlin.config.LanguageFeature
@@ -125,6 +126,17 @@ import org.jetbrains.kotlin.platform.wasm.WasmPlatforms
 import org.jetbrains.kotlin.psi.KtFile
 import java.io.File
 import java.nio.file.Path
+
+// With KSPLoader.keepJarHandlers, a registration that is never disposed keeps the application environment, and with it the
+// handlers of the jar file system, from one KSP task to the next. Without it, the environment is disposed with the last project.
+@OptIn(org.jetbrains.kotlin.K1Deprecation::class, CompilerConfiguration.Internals::class)
+private val keepApplicationEnvironment: Unit by lazy {
+    KotlinCoreEnvironment.getOrCreateApplicationEnvironmentForProduction(
+        Disposer.newDisposable("KSP application environment"),
+        CompilerConfiguration(),
+    )
+    Unit
+}
 
 @OptIn(KaPlatformInterface::class)
 @Suppress("UnstableApiUsage")
@@ -491,6 +503,7 @@ class KotlinSymbolProcessing(
             }
         }
 
+        if (KSPLoader.keepJarHandlers) keepApplicationEnvironment
         val projectDisposable: Disposable = Disposer.newDisposable("StandaloneAnalysisAPISession.project")
         var kotlinCoreProjectEnvironment: KotlinCoreProjectEnvironment? = null
         try {
@@ -673,7 +686,9 @@ class KotlinSymbolProcessing(
             codeGenerator.closeFiles()
         } finally {
             maybeRunInWriteAction {
-                (kotlinCoreProjectEnvironment?.environment?.jarFileSystem as? CoreJarFileSystem)?.clearHandlersCache()
+                (kotlinCoreProjectEnvironment?.environment?.jarFileSystem as? CoreJarFileSystem)?.let {
+                    if (KSPLoader.keepJarHandlers) it.clearChangedHandlers() else it.clearHandlersCache()
+                }
                 Disposer.dispose(projectDisposable)
                 ResolverAAImpl.tearDown()
                 KSPCoreEnvironment.tearDown()
