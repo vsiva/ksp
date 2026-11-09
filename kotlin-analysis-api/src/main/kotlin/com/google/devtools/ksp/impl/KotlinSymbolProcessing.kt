@@ -85,20 +85,22 @@ import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaSourceModule
 import org.jetbrains.kotlin.analysis.api.resolve.extensions.KaResolveExtensionProvider
 import org.jetbrains.kotlin.analysis.api.session.KaSessionProvider
-import org.jetbrains.kotlin.analysis.api.standalone.KotlinStaticPackagePartProviderFactory
+import com.google.devtools.ksp.standalone.KspModuleContainerBuilder
+import com.google.devtools.ksp.standalone.KspProjectStructureProvider
+import com.google.devtools.ksp.standalone.KspStandaloneAnalysisAPISession
+import com.google.devtools.ksp.standalone.KspStaticPackagePartProviderFactory
 import org.jetbrains.kotlin.analysis.api.standalone.StandaloneAnalysisAPISession
-import org.jetbrains.kotlin.analysis.api.standalone.base.KotlinStandalonePlatformSettings
-import org.jetbrains.kotlin.analysis.api.standalone.base.declarations.KotlinStandaloneAnnotationsResolverFactory
-import org.jetbrains.kotlin.analysis.api.standalone.base.declarations.KotlinStandaloneDeclarationProviderMerger
-import org.jetbrains.kotlin.analysis.api.standalone.base.modification.KotlinStandaloneModificationTrackerFactory
-import org.jetbrains.kotlin.analysis.api.standalone.base.permissions.KotlinStandaloneAnalysisPermissionOptions
-import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.FirStandaloneServiceRegistrar
-import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.StandaloneProjectFactory
+import org.jetbrains.kotlin.analysis.api.standalone.fir.KotlinStandalonePlatformSettings
+import org.jetbrains.kotlin.analysis.api.standalone.fir.declarations.KotlinStandaloneAnnotationsResolverFactory
+import org.jetbrains.kotlin.analysis.api.standalone.fir.declarations.KotlinStandaloneDeclarationProviderMerger
+import org.jetbrains.kotlin.analysis.api.standalone.fir.modification.KotlinStandaloneModificationTrackerFactory
+import org.jetbrains.kotlin.analysis.api.standalone.fir.permissions.KotlinStandaloneAnalysisPermissionOptions
+import org.jetbrains.kotlin.analysis.api.standalone.fir.projectStructure.FirStandaloneServiceRegistrar
+import org.jetbrains.kotlin.analysis.api.standalone.fir.projectStructure.StandaloneProjectFactory
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getResolutionFacade
 import org.jetbrains.kotlin.analysis.low.level.api.fir.lazy.resolve.LLFirResolutionActivityTracker
 import org.jetbrains.kotlin.analysis.low.level.api.fir.providers.LLSealedInheritorsProvider
 import org.jetbrains.kotlin.analysis.project.structure.builder.KtModuleBuilder
-import org.jetbrains.kotlin.analysis.project.structure.builder.KtModuleProviderBuilder
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreApplicationEnvironmentMode
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreProjectEnvironment
@@ -173,7 +175,8 @@ class KotlinSymbolProcessing(
         )
 
         // replaces buildKtModuleProviderByCompilerConfiguration(compilerConfiguration)
-        val projectStructureProvider = KtModuleProviderBuilder(
+        var targetPlatform: TargetPlatform? = null
+        val moduleContainer = KspModuleContainerBuilder(
             kotlinCoreProjectEnvironment.environment, project
         ).apply {
             val platform = when (kspConfig) {
@@ -249,7 +252,9 @@ class KotlinSymbolProcessing(
             }.apply(::addModule)
 
             this.platform = platform
+            targetPlatform = platform
         }.build()
+        val projectStructureProvider = KspProjectStructureProvider(targetPlatform!!, project, moduleContainer)
 
         // register services and build session
         val ktModuleProviderImpl = projectStructureProvider
@@ -297,12 +302,7 @@ class KotlinSymbolProcessing(
             project.extensionArea, PsiTreeChangeListener.EP.name, PsiTreeChangeAdapter::class.java
         )
         return Triple(
-            StandaloneAnalysisAPISession(kotlinCoreProjectEnvironment) {
-                // This is only used by kapt4, which should query a provider, instead of have it passed here IMHO.
-                // kapt4's implementation is static, which may or may not work for us depending on future use cases.
-                // Let's implement it later if necessary.
-                TODO("Not implemented yet.")
-            },
+            KspStandaloneAnalysisAPISession(kotlinCoreProjectEnvironment, modules),
             kotlinCoreProjectEnvironment,
             modules
         )
@@ -372,7 +372,7 @@ class KotlinSymbolProcessing(
             // declared in precompiled KLIBs (e.g. for Kotlin/Native and JS/Wasm targets).
             registerService(
                 KotlinPackageProviderFactory::class.java,
-                IncrementalKotlinPackageProviderFactory(project, libraryRoots)
+                IncrementalKotlinPackageProviderFactory(project, kotlinCoreProjectEnvironment.environment, libraryRoots)
             )
 
             registerService(
@@ -382,7 +382,7 @@ class KotlinSymbolProcessing(
 
             registerService(
                 KotlinPackagePartProviderFactory::class.java,
-                KotlinStaticPackagePartProviderFactory(packagePartProvider)
+                KspStaticPackagePartProviderFactory(packagePartProvider)
             )
 
             registerService(
@@ -414,7 +414,7 @@ class KotlinSymbolProcessing(
         }
 
         // Update Kotlin providers for newly generated source files.
-        (
+        val declarationProviderFactory = (
             project.getService(
                 KotlinDeclarationProviderFactory::class.java
             ) as IncrementalKotlinDeclarationProviderFactory
@@ -423,7 +423,7 @@ class KotlinSymbolProcessing(
             project.getService(
                 KotlinPackageProviderFactory::class.java
             ) as IncrementalKotlinPackageProviderFactory
-            ).update(ktFiles)
+            ).update(ktFiles, declarationProviderFactory)
 
         javaFileManager?.initialize(modules, javaFiles)
 
@@ -455,7 +455,7 @@ class KotlinSymbolProcessing(
         contentScope.addAll(javaFiles.map { it.virtualFile })
 
         // Update Kotlin providers for newly generated source files.
-        (
+        val declarationProviderFactory = (
             project.getService(
                 KotlinDeclarationProviderFactory::class.java
             ) as IncrementalKotlinDeclarationProviderFactory
@@ -464,7 +464,7 @@ class KotlinSymbolProcessing(
             project.getService(
                 KotlinPackageProviderFactory::class.java
             ) as IncrementalKotlinPackageProviderFactory
-            ).update(ktFiles)
+            ).update(ktFiles, declarationProviderFactory)
 
         // Update Java providers for newly generated source files.
         javaFileManager?.add(javaFiles)
@@ -594,10 +594,7 @@ class KotlinSymbolProcessing(
                 // to be resolved. Therefore, due to the implementation, it has to be registered repeatedly after the files
                 // are created.
                 val firSession = ResolverAAImpl.ktModule.getResolutionFacade(project)
-                firSession.useSiteFirSession.registerResolveComponents(
-                    KtRegisteredDiagnosticFactoriesStorage(),
-                    dualLookupTracker
-                )
+                firSession.useSiteFirSession.registerResolveComponents(lookupTracker = dualLookupTracker)
 
                 val resolutionStrategy =
                     if (kspConfig.experimentalPsiResolution)

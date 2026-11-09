@@ -1,5 +1,6 @@
 package com.google.devtools.ksp.impl.symbol.kotlin.resolved
 
+import com.google.devtools.ksp.impl.symbol.kotlin.kspUseSiteTarget
 import com.google.devtools.ksp.common.IdKeyPair
 import com.google.devtools.ksp.common.KSObjectCache
 import com.google.devtools.ksp.common.impl.KSNameImpl
@@ -149,7 +150,7 @@ class KSAnnotationResolvedImpl private constructor(
         if (parent?.origin == Origin.KOTLIN_LIB || parent?.origin == Origin.JAVA_LIB)
             return@lazy null
 
-        when (annotationApplication.useSiteTarget) {
+        when (annotationApplication.kspUseSiteTarget) {
             null -> null
             FILE -> AnnotationUseSiteTarget.FILE
             PROPERTY -> AnnotationUseSiteTarget.PROPERTY

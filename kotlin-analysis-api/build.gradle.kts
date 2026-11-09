@@ -411,7 +411,11 @@ kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xcontext-parameters")
         // The Analysis API of a newer Kotlin (-PaaKotlinVersion) has a newer metadata version than the compiler of KSP reads.
-        if (hasProperty("aaKotlinVersion")) freeCompilerArgs.add("-Xskip-metadata-version-check")
+        if (hasProperty("aaKotlinVersion")) {
+            freeCompilerArgs.add("-Xskip-metadata-version-check")
+            // KSP builds its standalone session from parts that the newer Analysis API marks as implementation details.
+            freeCompilerArgs.add("-opt-in=org.jetbrains.kotlin.analysis.api.KaImplementationDetail")
+        }
     }
 }
 

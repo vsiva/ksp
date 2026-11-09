@@ -242,9 +242,11 @@ internal class DeclarationOrdering(
         return null
     }
 
+    // Newer versions also pass the exceptions of the method; the ordering does not need them.
     override fun visitMethod(
         name: Name,
-        desc: String
+        desc: String,
+        exceptions: List<ClassId>,
     ): KotlinJvmBinaryClass.MethodAnnotationVisitor? {
         methodOrdering.getOrPut(name.asString()) {
             mutableMapOf()

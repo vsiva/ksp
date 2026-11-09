@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinCompositeDe
 import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinDeclarationProvider
 import org.jetbrains.kotlin.analysis.api.platform.declarations.KotlinDeclarationProviderFactory
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
-import org.jetbrains.kotlin.analysis.api.standalone.base.declarations.KotlinStandaloneDeclarationProviderFactory
+import org.jetbrains.kotlin.analysis.api.standalone.fir.declarations.KotlinStandaloneDeclarationProviderFactory
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
@@ -30,7 +30,8 @@ class IncrementalKotlinDeclarationProviderFactory(
         return KotlinCompositeDeclarationProvider.create(providers)
     }
 
-    fun update(files: Collection<KtFile>) {
+    /** Adds a factory for [files] and returns it; the package provider factory of the round reads its package names. */
+    fun update(files: Collection<KtFile>): KotlinStandaloneDeclarationProviderFactory {
         val skipBuiltIns = staticFactories.isNotEmpty()
         val staticFactory = KotlinStandaloneDeclarationProviderFactory(
             project,
@@ -39,6 +40,7 @@ class IncrementalKotlinDeclarationProviderFactory(
             skipBuiltins = skipBuiltIns
         )
         staticFactories.add(staticFactory)
+        return staticFactory
     }
 
     fun getDirectInheritorCandidates(baseClassName: Name): Set<KtClassOrObject> =

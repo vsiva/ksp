@@ -7,7 +7,7 @@ import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.impl.file.impl.JavaFileManager
 import com.intellij.psi.search.ProjectScope
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
-import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.StandaloneProjectFactory
+import org.jetbrains.kotlin.analysis.api.standalone.fir.projectStructure.StandaloneProjectFactory
 import org.jetbrains.kotlin.cli.create
 import org.jetbrains.kotlin.cli.jvm.compiler.JvmPackagePartProvider
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCliJavaFileManagerImpl
@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
+import org.jetbrains.kotlin.resolve.jvm.modules.JavaModuleFinder
 
 class IncrementalJavaFileManager(val environment: KotlinCoreProjectEnvironment) {
     lateinit var rootsIndex: JvmDependenciesDynamicCompoundIndex
@@ -90,7 +91,10 @@ class IncrementalJavaFileManager(val environment: KotlinCoreProjectEnvironment) 
             rootsIndex,
             packagePartProviders,
             SingleJavaFileRootsIndex(singleJavaFileRoots),
-            true, null
+            true,
+            // No module finder, as before: newer versions take a finder that is not null and the performance manager.
+            JavaModuleFinder { null },
+            null,
         )
     }
 
@@ -133,7 +137,10 @@ class IncrementalJavaFileManager(val environment: KotlinCoreProjectEnvironment) 
             rootsIndex,
             packagePartProviders,
             SingleJavaFileRootsIndex(singleJavaFileRoots),
-            true, null
+            true,
+            // No module finder, as before: newer versions take a finder that is not null and the performance manager.
+            JavaModuleFinder { null },
+            null,
         )
     }
 }

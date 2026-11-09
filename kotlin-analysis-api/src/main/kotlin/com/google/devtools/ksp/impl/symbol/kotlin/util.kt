@@ -182,11 +182,17 @@ internal fun mapAAOrigin(ktSymbol: KaSymbol): Origin {
     }
 }
 
+// Newer Analysis APIs deprecate KaAnnotation.useSiteTarget with ERROR and suggest the target of the PSI instead, which binary
+// annotations do not have. KSP keeps the value of the Analysis API, so that its results do not change.
+@Suppress("DEPRECATION_ERROR", "DEPRECATION")
+internal val KaAnnotation.kspUseSiteTarget: AnnotationUseSiteTargetAA?
+    get() = useSiteTarget
+
 internal fun KaAnnotation.render(): String {
     return buildString {
         append("@")
-        if (this@render.useSiteTarget != null) {
-            append(this@render.useSiteTarget!!.renderName + ":")
+        if (this@render.kspUseSiteTarget != null) {
+            append(this@render.kspUseSiteTarget!!.renderName + ":")
         }
         append(this@render.classId!!.shortClassName.asString())
         if (arguments.isNotEmpty()) {

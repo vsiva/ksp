@@ -27,8 +27,8 @@ import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaSourceModule
 import org.jetbrains.kotlin.analysis.project.structure.builder.KtModuleBuilder
 import org.jetbrains.kotlin.analysis.project.structure.builder.KtModuleBuilderDsl
-import org.jetbrains.kotlin.analysis.project.structure.builder.KtModuleProviderBuilder
-import org.jetbrains.kotlin.analysis.project.structure.impl.KaSourceModuleImpl
+import org.jetbrains.kotlin.analysis.project.structure.builder.KaModuleContainerBuilder
+import org.jetbrains.kotlin.analysis.api.standalone.fir.projectStructure.KaSourceModuleImpl
 import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.config.LanguageVersionSettings
@@ -110,7 +110,7 @@ class IncrementalGlobalSearchScope(
 }
 
 @OptIn(ExperimentalContracts::class)
-public inline fun KtModuleProviderBuilder.buildKspSourceModule(
+public inline fun KaModuleContainerBuilder.buildKspSourceModule(
     init: KspModuleBuilder.() -> Unit
 ): KaSourceModule {
     contract {

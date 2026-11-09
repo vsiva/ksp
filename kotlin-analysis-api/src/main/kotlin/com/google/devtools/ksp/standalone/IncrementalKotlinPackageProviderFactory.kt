@@ -1,5 +1,6 @@
 package com.google.devtools.ksp.standalone
 
+import com.intellij.core.CoreApplicationEnvironment
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -9,12 +10,14 @@ import org.jetbrains.kotlin.analysis.api.KaPlatformInterface
 import org.jetbrains.kotlin.analysis.api.platform.packages.KotlinCompositePackageProvider
 import org.jetbrains.kotlin.analysis.api.platform.packages.KotlinPackageProvider
 import org.jetbrains.kotlin.analysis.api.platform.packages.KotlinPackageProviderFactory
-import org.jetbrains.kotlin.analysis.api.standalone.base.packages.KotlinStandalonePackageProviderFactory
+import org.jetbrains.kotlin.analysis.api.standalone.fir.declarations.KotlinStandaloneDeclarationProviderFactory
+import org.jetbrains.kotlin.analysis.api.standalone.fir.packages.KotlinStandalonePackageProviderFactory
 import org.jetbrains.kotlin.psi.KtFile
 
 @OptIn(KaPlatformInterface::class)
 class IncrementalKotlinPackageProviderFactory(
     private val project: Project,
+    environment: CoreApplicationEnvironment,
     libraryRoots: List<VirtualFile> = emptyList(),
 ) : KotlinPackageProviderFactory, Disposable {
     private val staticFactories: MutableList<KotlinStandalonePackageProviderFactory> = mutableListOf()
@@ -25,7 +28,10 @@ class IncrementalKotlinPackageProviderFactory(
         if (libraryRoots.isNotEmpty()) {
             val libFactory = KotlinStandalonePackageProviderFactory(
                 project = project,
-                indexedFiles = emptyList(),
+                sourceKtFiles = emptyList(),
+                declarationProviderFactory = KotlinStandaloneDeclarationProviderFactory(
+                    project, environment, emptyList(), skipBuiltins = true
+                ),
                 libraryRoots = libraryRoots,
             )
             Disposer.register(this, libFactory)
@@ -38,7 +44,7 @@ class IncrementalKotlinPackageProviderFactory(
         return KotlinCompositePackageProvider.create(providers)
     }
 
-    fun update(files: Collection<KtFile>) {
+    fun update(files: Collection<KtFile>, declarationProviderFactory: KotlinStandaloneDeclarationProviderFactory) {
         // Skip adding an empty factory if this round generated no new Kotlin files.
         if (files.isEmpty()) return
 
@@ -47,7 +53,8 @@ class IncrementalKotlinPackageProviderFactory(
         // so passing libraryRoots again would redundantly duplicate KLIB parsing and Caffeine caching.
         val staticFactory = KotlinStandalonePackageProviderFactory(
             project = project,
-            indexedFiles = files,
+            sourceKtFiles = files,
+            declarationProviderFactory = declarationProviderFactory,
             libraryRoots = emptyList(),
         )
         Disposer.register(this, staticFactory)
