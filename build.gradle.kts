@@ -49,6 +49,9 @@ subprojects {
     version = rootProject.extra.get("kspVersion") as String
     configureKtfmt()
     repositories {
+        // The Analysis API of a fork, published to ~/.m2 with a version that ends in -jbaa or -k3aa (-PaaKotlinVersion), and
+        // the standard library of a local build of Kotlin, with a version that ends in -jb (-PaaStdlibVersion).
+        mavenLocal { content { includeVersionByRegex("org\\.jetbrains\\.kotlin", ".*", ".*-(jbaa|k3aa|jb)") } }
         google()
         maven("https://redirector.kotlinlang.org/maven/bootstrap/")
         maven("https://www.jetbrains.com/intellij-repository/releases")

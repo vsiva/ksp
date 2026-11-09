@@ -21,8 +21,10 @@ val kotlinBaseVersion = libs.versions.kotlin.base.get()
 val libsForTesting: Configuration by configurations.creating
 val libsForTestingCommon: Configuration by configurations.creating
 
-val aaKotlinBaseVersion = libs.versions.aa.kotlin.base.get()
-val aaIntellijVersion = libs.versions.aa.intellij.get()
+// -PaaKotlinVersion and -PaaIntellijVersion build KSP against another Analysis API, such as one published from a fork.
+val aaKotlinBaseVersion = (findProperty("aaKotlinVersion") as String?) ?: libs.versions.aa.kotlin.base.get()
+val aaIntellijVersion = (findProperty("aaIntellijVersion") as String?) ?: libs.versions.aa.intellij.get()
+val aaStdlibVersion = (findProperty("aaStdlibVersion") as String?) ?: aaKotlinBaseVersion
 val aaCoroutinesVersion = libs.versions.aa.coroutines.get()
 
 plugins {
@@ -159,7 +161,7 @@ dependencies {
 
     implementation(libs.aa.collectionsImmutable)
     implementation(libs.kotlinx.serialization.json)
-    compileOnly(kotlin("stdlib", aaKotlinBaseVersion))
+    compileOnly(kotlin("stdlib", aaStdlibVersion))
 
     implementation(libs.aa.guava)
     implementation(libs.aa.streamex)
@@ -191,7 +193,7 @@ dependencies {
     implementation(project(":api"))
     implementation(project(":common-util"))
 
-    testImplementation(kotlin("stdlib", aaKotlinBaseVersion))
+    testImplementation(kotlin("stdlib", aaStdlibVersion))
     testImplementation(libs.junit4)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
@@ -209,10 +211,10 @@ dependencies {
 
     // See AbstractKSPTest's init block if you change any of the `libsForTesting` or
     // `libsForTestingCommon` dependencies.
-    libsForTesting(kotlin("stdlib", aaKotlinBaseVersion))
+    libsForTesting(kotlin("stdlib", aaStdlibVersion))
     libsForTesting(kotlin("test", aaKotlinBaseVersion))
     libsForTesting(kotlin("script-runtime", aaKotlinBaseVersion))
-    libsForTestingCommon(kotlin("stdlib-common", aaKotlinBaseVersion))
+    libsForTestingCommon(kotlin("stdlib-common", aaStdlibVersion))
 
     depJarsForCheck("org.jetbrains.kotlin:kotlin-stdlib:$kotlinBaseVersion")
     depJarsForCheck("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$aaCoroutinesVersion")
@@ -408,6 +410,8 @@ signing {
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xcontext-parameters")
+        // The Analysis API of a newer Kotlin (-PaaKotlinVersion) has a newer metadata version than the compiler of KSP reads.
+        if (hasProperty("aaKotlinVersion")) freeCompilerArgs.add("-Xskip-metadata-version-check")
     }
 }
 

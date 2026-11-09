@@ -12,7 +12,8 @@ evaluationDependsOn(":kotlin-analysis-api")
 val signingKey: String? by project
 val signingPassword: String? by project
 
-val aaKotlinBaseVersion = libs.versions.aa.kotlin.base.get()
+// -PaaKotlinVersion and -PaaIntellijVersion build KSP against another Analysis API, such as one published from a fork.
+val aaKotlinBaseVersion = (findProperty("aaKotlinVersion") as String?) ?: libs.versions.aa.kotlin.base.get()
 
 plugins {
     kotlin("jvm")
