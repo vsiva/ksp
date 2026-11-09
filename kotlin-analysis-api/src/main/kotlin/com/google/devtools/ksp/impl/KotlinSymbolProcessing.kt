@@ -96,6 +96,9 @@ import org.jetbrains.kotlin.analysis.api.standalone.fir.declarations.KotlinStand
 import org.jetbrains.kotlin.analysis.api.standalone.fir.modification.KotlinStandaloneModificationTrackerFactory
 import org.jetbrains.kotlin.analysis.api.standalone.fir.permissions.KotlinStandaloneAnalysisPermissionOptions
 import org.jetbrains.kotlin.analysis.api.standalone.fir.projectStructure.FirStandaloneServiceRegistrar
+import org.jetbrains.kotlin.analysis.api.standalone.fir.projectStructure.ApplicationServiceRegistration
+import org.jetbrains.kotlin.analysis.api.standalone.fir.services.LLStandaloneFirElementByPsiElementChooser
+import org.jetbrains.kotlin.analysis.low.level.api.fir.api.services.LLFirElementByPsiElementChooser
 import org.jetbrains.kotlin.analysis.api.standalone.fir.projectStructure.StandaloneProjectFactory
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getResolutionFacade
 import org.jetbrains.kotlin.analysis.low.level.api.fir.lazy.resolve.LLFirResolutionActivityTracker
@@ -164,6 +167,15 @@ class KotlinSymbolProcessing(
                 projectDisposable,
                 KotlinCoreApplicationEnvironmentMode.Production
             )
+
+        // Newer Analysis APIs register the application services, and their extension points, when the session is built, no
+        // longer when the project environment is created.
+        ApplicationServiceRegistration.register(
+            kotlinCoreProjectEnvironment.environment.application,
+            kotlinCoreProjectEnvironment.environment.parentDisposable,
+            listOf(FirStandaloneServiceRegistrar),
+            Unit,
+        )
 
         val project: MockProject = kotlinCoreProjectEnvironment.project
 
@@ -378,6 +390,10 @@ class KotlinSymbolProcessing(
             registerService(
                 SealedClassInheritorsProvider::class.java,
                 LLSealedInheritorsProvider::class.java,
+            )
+            registerService(
+                LLFirElementByPsiElementChooser::class.java,
+                LLStandaloneFirElementByPsiElementChooser::class.java,
             )
 
             registerService(

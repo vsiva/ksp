@@ -25,6 +25,9 @@ val libsForTestingCommon: Configuration by configurations.creating
 val aaKotlinBaseVersion = (findProperty("aaKotlinVersion") as String?) ?: libs.versions.aa.kotlin.base.get()
 val aaIntellijVersion = (findProperty("aaIntellijVersion") as String?) ?: libs.versions.aa.intellij.get()
 val aaStdlibVersion = (findProperty("aaStdlibVersion") as String?) ?: aaKotlinBaseVersion
+// -PaaIntellijCoreJars=<jar>,<jar>: the IntelliJ core jars of the Kotlin build that published -PaaKotlinVersion
+// (dependencies/intellij-java-psi-api and dependencies/intellij-core-implementation).
+val aaIntellijCoreJars = (findProperty("aaIntellijCoreJars") as String?)?.split(",")
 val aaCoroutinesVersion = libs.versions.aa.coroutines.get()
 
 plugins {
@@ -136,9 +139,13 @@ dependencies {
             "com.jetbrains.intellij.java:java-psi-impl",
         )
         .forEach {
-            intellijOriginal("$it:$aaIntellijVersion")
-            depSourceJars("$it:$aaIntellijVersion:sources") { isTransitive = false }
+            if (aaIntellijCoreJars == null) {
+                intellijOriginal("$it:$aaIntellijVersion")
+                depSourceJars("$it:$aaIntellijVersion:sources") { isTransitive = false }
+            }
         }
+    // A newer Kotlin assembles the IntelliJ core from more platform modules and its own sources; use its jars as they are.
+    aaIntellijCoreJars?.let { intellijOriginal(files(it)) }
     implementation(files(transformedIntellijDeps.map { it.outputDir.asFileTree }))
 
     listOf(

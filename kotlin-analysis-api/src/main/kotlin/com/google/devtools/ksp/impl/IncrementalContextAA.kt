@@ -57,6 +57,7 @@ import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.types.KaTypeParameterType
 import org.jetbrains.kotlin.analysis.api.types.symbol
 import org.jetbrains.kotlin.incremental.IncrementalCompilationContext
+import org.jetbrains.kotlin.incremental.NonRecoverableCompilationTransaction
 import org.jetbrains.kotlin.incremental.LookupStorage
 import org.jetbrains.kotlin.incremental.LookupSymbol
 import org.jetbrains.kotlin.incremental.LookupTrackerImpl
@@ -90,7 +91,10 @@ class IncrementalContextAA(
     changedClasses,
 ) {
     private val PATH_CONVERTER = RelativeFileToPathConverter(baseDir)
-    private val icContext = IncrementalCompilationContext(PATH_CONVERTER, PATH_CONVERTER, true)
+    // The default transaction of newer versions is read-only and fails on each write of the lookup caches.
+    private val icContext = IncrementalCompilationContext(
+        PATH_CONVERTER, PATH_CONVERTER, true, transaction = NonRecoverableCompilationTransaction()
+    )
 
     private val symbolLookupCacheDir = File(cachesDir, "symbolLookups")
 
