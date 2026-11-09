@@ -44,16 +44,17 @@ class IncrementalKotlinDeclarationProviderFactory(
     fun update(files: Collection<KtFile>) {
         val skipBuiltIns = staticFactories.isNotEmpty()
         val filesToIndex = files.toList()
-        staticFactories.add(
-            lazy {
-                KotlinStandaloneDeclarationProviderFactory(
-                    project,
-                    environment,
-                    filesToIndex,
-                    skipBuiltins = skipBuiltIns
-                )
-            }
-        )
+        val factory = lazy {
+            KotlinStandaloneDeclarationProviderFactory(
+                project,
+                environment,
+                filesToIndex,
+                skipBuiltins = skipBuiltIns
+            )
+        }
+        // -Dksp.lazy.source.index=true in the JVM of the KSP worker (the Gradle daemon) turns the lazy index on.
+        if (System.getProperty("ksp.lazy.source.index") != "true") factory.value
+        staticFactories.add(factory)
     }
 
     fun getDirectInheritorCandidates(baseClassName: Name): Set<KtClassOrObject> =
