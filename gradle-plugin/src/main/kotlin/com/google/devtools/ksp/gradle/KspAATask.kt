@@ -470,6 +470,12 @@ abstract class KspAATask @Inject constructor(
                             .map { it.toBoolean() }
                             .orElse(false)
                     )
+                    cfg.classLoaderCache.value(
+                        project.providers
+                            .gradleProperty("ksp.classloader.cache")
+                            .map { it.toBoolean() }
+                            .orElse(false)
+                    )
                     // TODO: pass targets of common
                 }
             }
@@ -714,6 +720,11 @@ abstract class KspGradleConfig @Inject constructor() {
 
     @get:Internal
     abstract val profilingMode: Property<Boolean>
+
+    // Keep the class loaders of KSP and of the processors in the daemon (ksp.classloader.cache). A processor with static
+    // state then keeps it from one module and one build to the next; turn this off for such a processor.
+    @get:Internal
+    abstract val classLoaderCache: Property<Boolean>
 }
 
 interface KspAAWorkParameter : WorkParameters {
@@ -732,19 +743,30 @@ abstract class KspAAWorkerAction : WorkAction<KspAAWorkParameter> {
         val kspClasspath = parameters.kspClasspath
         val isolatedClassLoaderCache = IsolatedClassLoaderCache.cache
         val key = kspClasspath.files.map { it.toURI().toURL() }.joinToString { it.path }
-        val isolatedClassLoader = isolatedClassLoaderCache.computeIfAbsent(key) {
-            URLClassLoader(
-                kspClasspath.files.map { it.toURI().toURL() }.toTypedArray(),
-                ClassLoader.getPlatformClassLoader()
-            )
-        }
+        val keepLoaders = gradleCfg.classLoaderCache.getOrElse(false)
+        val isolatedClassLoader =
+            (if (keepLoaders) IsolatedClassLoaderCache.keptLoader("ksp|$key", kspClasspath.files.toList(), ClassLoader.getPlatformClassLoader()) else null)
+                ?: isolatedClassLoaderCache.computeIfAbsent(key) {
+                    URLClassLoader(
+                        kspClasspath.files.map { it.toURI().toURL() }.toTypedArray(),
+                        ClassLoader.getPlatformClassLoader()
+                    )
+                }
 
         // Clean stale files for now.
         // TODO: support incremental processing.
         gradleCfg.outputBaseDir.get().asFile.deleteRecursively()
 
-        val processorClassloader = URLClassLoader(
-            gradleCfg.processorClasspath.files.map { it.toURI().toURL() }.toTypedArray(),
+        val processorFiles = gradleCfg.processorClasspath.files.toList()
+        val keptProcessorClassloader = if (keepLoaders) {
+            IsolatedClassLoaderCache.keptLoader(
+                "processors|$key|" + processorFiles.joinToString { it.path },
+                processorFiles,
+                isolatedClassLoader
+            )
+        } else null
+        val processorClassloader = keptProcessorClassloader ?: URLClassLoader(
+            processorFiles.map { it.toURI().toURL() }.toTypedArray(),
             isolatedClassLoader
         )
         if (gradleCfg.profilingMode.get()) {
@@ -860,7 +882,7 @@ abstract class KspAAWorkerAction : WorkAction<KspAAWorkParameter> {
             kspGradleLogger.exception(e.targetException)
             throw e.targetException
         } finally {
-            processorClassloader.close()
+            if (keptProcessorClassloader == null) processorClassloader.close()
         }
 
         if (exitCode != ExitCode.OK) {
